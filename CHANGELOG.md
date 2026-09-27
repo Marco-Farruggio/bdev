@@ -17,22 +17,24 @@
 - made a tui.rs file to handle that
 - added an enum for the MBR partition type byte
 - removed protective gpt in favour of just gpt as its part of the spec
+- removed number of devices indicator
+- added a top toolbar to show which menu, devices, settings, or help
+- removed clap dependency, i dont plan to have any cli for a while
+- handle selection myself instead of letting ratatui lists do it
+- moved all tui into tui.rs
 
 # To-Do:
 
+- show which menu is currently selected clearly
 - rename some reads to detect
-- extract selection state from ratatui and handle myself
 - heirarchy for NVMEs by namespace also
 - human readable mode
-- help menu
 - formatting
-- purpose settings
 - partitioning
 - drop mouse events
 - highlight whole device, then whole namespace, then partition
 - move device logic into a specific file
-- move all tui into tui.rs
 - make read devices return an option/error, shouldnt ever, but we'll see
-- inverse for highlighting
 - disk/partition enum with an impl enum pub fn name()
 - trait for partition schemes
+- make a nicer hotkey/menu generator func/macro

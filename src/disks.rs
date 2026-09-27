@@ -1,3 +1,8 @@
+use crate::partitions::{Partition, PartitionScheme, read_partition_scheme};
+use std::collections::HashMap;
+use std::fs;
+
+
 /// Reads a block device's size in bytes (via sysfs).
 /// The `size` file *always* reports the size as a count of 512-byte sectors,
 /// regardless of the device's real physical sector size, a longstanding kernel
@@ -28,4 +33,64 @@ pub fn format_nbytes(nbytes: u64) -> String {
     }
 
     format!("{size:.1} {}", UNITS[unit_index])
+}
+
+pub struct Disk {
+    pub name: String,
+    pub size: Option<u64>,
+    pub partition_scheme: Result<Option<PartitionScheme>, std::io::Error>,
+    pub partitions: Vec<Partition>,
+}
+
+fn is_partition(name: &str) -> bool {
+    fs::metadata(format!("/sys/class/block/{name}/partition")).is_ok()
+}
+
+pub fn read_block_devices() -> Vec<Disk> {
+    let mut names: Vec<String> = match fs::read_dir("/sys/class/block") {
+        Ok(read_dir) => read_dir
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect(),
+        Err(_) => return Vec::new(),
+    };
+    names.sort();
+
+    let mut disks: Vec<Disk> = Vec::new();
+    let mut partitions_of: HashMap<String, Vec<Partition>> = HashMap::new();
+
+    for name in &names {
+        if is_partition(name) {
+            let link_path = format!("/sys/class/block/{name}");
+            if let Ok(real_path) = fs::canonicalize(&link_path) {
+                if let Some(parent) = real_path
+                    .parent()
+                    .and_then(|p| p.file_name())
+                    .map(|f| f.to_string_lossy().into_owned())
+                {
+                    partitions_of.entry(parent).or_default().push(
+                        Partition {
+                            name: name.clone(),
+                            size: crate::disks::read_size_bytes(&name)
+                        }
+                    );
+                }
+            }
+        } else {
+            disks.push(Disk {
+                name: name.clone(),
+                size: crate::disks::read_size_bytes(name),
+                partition_scheme: read_partition_scheme(name),
+                partitions: Vec::new(),
+            });
+        }
+    }
+
+    for disk in &mut disks {
+        if let Some(parts) = partitions_of.remove(&disk.name) {
+            disk.partitions = parts;
+        }
+    }
+
+    disks
 }

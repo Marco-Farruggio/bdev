@@ -7,20 +7,28 @@ pub enum PartitionScheme {
     Mbr,
 }
 
+pub struct Partition {
+    pub name: String,
+    // pub index: Result<u8, std::io::Error>,
+    pub size: Option<u64>,
+    // bootable: Result<bool, std::io::Error>,
+    // part_type: crate::mbr::MbrPartitionType,
+}
+
 impl std::fmt::Display for PartitionScheme {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Mbr           => write!(f, "MBR"),
-            Self::Gpt           => write!(f, "GPT"),
+            Self::Mbr => write!(f, "MBR"),
+            Self::Gpt => write!(f, "GPT"),
         }
     }
 }
 
 pub fn scheme_to_str(scheme: &Option<PartitionScheme>) -> &'static str {
     match scheme {
-        Some(PartitionScheme::Gpt)           => "GPT",
-        Some(PartitionScheme::Mbr)           => "MBR",
-        None                                 => "RAW"
+        Some(PartitionScheme::Gpt) => "GPT",
+        Some(PartitionScheme::Mbr) => "MBR",
+        None                       => "RAW"
     }
 }
 
