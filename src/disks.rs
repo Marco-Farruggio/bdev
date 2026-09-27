@@ -1,4 +1,11 @@
-use crate::partitions::{Partition, PartitionScheme, read_partition_scheme};
+use crate::partitions::{
+    Partition,
+    PartitionScheme,
+    is_partition,
+    detect_partition_scheme,
+    detect_partition_index,
+};
+
 use std::collections::HashMap;
 use std::fs;
 
@@ -42,10 +49,6 @@ pub struct Disk {
     pub partitions: Vec<Partition>,
 }
 
-fn is_partition(name: &str) -> bool {
-    fs::metadata(format!("/sys/class/block/{name}/partition")).is_ok()
-}
-
 pub fn read_block_devices() -> Vec<Disk> {
     let mut names: Vec<String> = match fs::read_dir("/sys/class/block") {
         Ok(read_dir) => read_dir
@@ -71,6 +74,7 @@ pub fn read_block_devices() -> Vec<Disk> {
                     partitions_of.entry(parent).or_default().push(
                         Partition {
                             name: name.clone(),
+                            index: detect_partition_index(&name),
                             size: crate::disks::read_size_bytes(&name)
                         }
                     );
@@ -80,7 +84,7 @@ pub fn read_block_devices() -> Vec<Disk> {
             disks.push(Disk {
                 name: name.clone(),
                 size: crate::disks::read_size_bytes(name),
-                partition_scheme: read_partition_scheme(name),
+                partition_scheme: detect_partition_scheme(name),
                 partitions: Vec::new(),
             });
         }

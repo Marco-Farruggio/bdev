@@ -22,6 +22,7 @@
 - removed clap dependency, i dont plan to have any cli for a while
 - handle selection myself instead of letting ratatui lists do it
 - moved all tui into tui.rs
+- detect partition index from /sys/class/block, rather than parsing each name
 
 # To-Do:
 
@@ -38,3 +39,4 @@
 - disk/partition enum with an impl enum pub fn name()
 - trait for partition schemes
 - make a nicer hotkey/menu generator func/macro
+- check is partition and partition index in one call

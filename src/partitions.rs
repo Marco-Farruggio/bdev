@@ -1,20 +1,11 @@
-use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
+use std::fs::{self, File};
+use std::io::{Result as IoResult, Read, Seek, SeekFrom};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PartitionScheme {
     Gpt,
     Mbr,
 }
-
-pub struct Partition {
-    pub name: String,
-    // pub index: Result<u8, std::io::Error>,
-    pub size: Option<u64>,
-    // bootable: Result<bool, std::io::Error>,
-    // part_type: crate::mbr::MbrPartitionType,
-}
-
 impl std::fmt::Display for PartitionScheme {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -24,6 +15,15 @@ impl std::fmt::Display for PartitionScheme {
     }
 }
 
+pub struct Partition {
+    pub name: String,
+    pub index: Option<u8>,
+    pub size: Option<u64>,
+    // bootable: Result<bool, std::io::Error>,
+    // part_type: crate::mbr::MbrPartitionType,
+}
+
+
 pub fn scheme_to_str(scheme: &Option<PartitionScheme>) -> &'static str {
     match scheme {
         Some(PartitionScheme::Gpt) => "GPT",
@@ -32,7 +32,7 @@ pub fn scheme_to_str(scheme: &Option<PartitionScheme>) -> &'static str {
     }
 }
 
-pub fn read_partition_scheme(disk_name: &str) -> Result<Option<PartitionScheme>, std::io::Error> {
+pub fn detect_partition_scheme(disk_name: &str) -> IoResult<Option<PartitionScheme>> {
     let mut file = File::open(format!("/dev/{disk_name}"))?;
 
     let mut sector0 = [0u8; 512];
@@ -71,4 +71,16 @@ pub fn maybe_scheme_to_str(scheme: &Result<Option<PartitionScheme>, std::io::Err
             }
         }
     }
+}
+
+pub fn is_partition(name: &str) -> bool {
+    fs::metadata(format!("/sys/class/block/{name}/partition")).is_ok()
+}
+
+/// takes a device's full name and attempts to detect its
+/// partition index directly by reading the partition table
+pub fn detect_partition_index(name: &str) -> Option<u8> {
+    fs::read_to_string(format!("/sys/class/block/{name}/partition"))
+        .ok()
+        .and_then(|s| s.trim().parse().ok())
 }

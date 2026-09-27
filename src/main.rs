@@ -1,3 +1,7 @@
+//! # bdev
+//! 
+//! bdev is a block device manipulation CLI TUI written in Rust for Linux
+
 mod partitions;
 mod disks;
 mod tui;
