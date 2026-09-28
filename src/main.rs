@@ -3,10 +3,11 @@
 //! bdev is a block device manipulation CLI TUI written in Rust for Linux
 
 mod partitions;
+mod commands;
 mod disks;
+mod files;
 mod tui;
 mod mbr;
-
 
 fn main() -> std::io::Result<()> {
     let mut terminal = ratatui::init();

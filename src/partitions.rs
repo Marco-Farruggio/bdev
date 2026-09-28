@@ -1,7 +1,8 @@
 use std::fs::{self, File};
 use std::io::{Result as IoResult, Read, Seek, SeekFrom};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug)] // Temporarily
 pub enum PartitionScheme {
     Gpt,
     Mbr,

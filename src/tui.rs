@@ -1,16 +1,12 @@
-use std::time::Duration;
+use std::{f32::consts::E, time::Duration};
 
 use ratatui::{
-    DefaultTerminal, Frame,
-    crossterm::event::{self, Event, KeyCode},
-    widgets::{Block, Borders, BorderType, Paragraph},
-    layout::{Constraint, Layout},
-    style::{Modifier, Style},
-    text::{Line, Span},
+    DefaultTerminal, Frame, crossterm::{event::{self, Event, KeyCode}, style}, layout::{Constraint, Layout}, style::{Modifier, Style}, text::{Line, Span}, widgets::{Block, BorderType, Borders, Paragraph},
 };
 
 use crate::{
     disks::{Disk, read_block_devices},
+    commands::Command,
 };
 
 pub fn spans_from_hotkey_word<'a>(letter: &'a str, rest: &'a str) -> Vec<Span<'a>> {
@@ -28,9 +24,9 @@ pub enum SelectedMenu {
 
 struct App {
     view: SelectedMenu,
+    commands: Vec<Command>,
     disks: Vec<Disk>,
-    selected_name: Option<String>,
-    highlighted_name: Option<String>,
+    hovered_dev: Option<String>,
 }
 
 impl App {
@@ -39,9 +35,9 @@ impl App {
         let highlighted_name = flatten(&disks).into_iter().next();
         Self {
             view: SelectedMenu::Devices,
-            disks: read_block_devices(),
-            selected_name: None,
-            highlighted_name,
+            commands: Vec::new(),
+            disks,
+            hovered_dev: highlighted_name,
         }
     }
 
@@ -59,7 +55,7 @@ impl App {
         if rows.is_empty() {
             return;
         }
-        if let Some(highlighted_name) = &self.highlighted_name {
+        if let Some(highlighted_name) = &self.hovered_dev {
             match rows.iter().position(|r| r == highlighted_name) {
                 Some(i) => {
                     if i == rows.len() - 1 {
@@ -67,10 +63,10 @@ impl App {
                         // so loop back round to the start
                         //
                         // safety: rows is guarded to be of len >= 1
-                        self.highlighted_name = Some(rows[0].clone());
+                        self.hovered_dev = Some(rows[0].clone());
                     } else {
                         // safety: rows is guarded to be atleast 1 less than rows.len()
-                        self.highlighted_name = Some(rows[i + 1].clone());
+                        self.hovered_dev = Some(rows[i + 1].clone());
                     }
                 }
                 None => {
@@ -79,12 +75,12 @@ impl App {
                     // as we assured above that rows is not empty
                     //
                     // safety: rows is guarded to be of len >= 1
-                    self.highlighted_name = Some(rows[0].clone());
+                    self.hovered_dev = Some(rows[0].clone());
                 }
             }
         } else {
             // safety: rows is guarded to be of len >= 1
-            self.highlighted_name = Some(rows[0].clone());
+            self.hovered_dev = Some(rows[0].clone());
         }
     }
 
@@ -93,7 +89,7 @@ impl App {
         if rows.is_empty() {
             return;
         }
-        if let Some(highlighted_name) = &self.highlighted_name {
+        if let Some(highlighted_name) = &self.hovered_dev {
             match rows.iter().position(|r| r == highlighted_name) {
                 Some(i) => {
                     if i == 0 {
@@ -101,10 +97,10 @@ impl App {
                         // so loop back round to the start
                         //
                         // safety: rows is guarded to be of len >= 1
-                        self.highlighted_name = Some(rows[rows.len() - 1].clone());
+                        self.hovered_dev = Some(rows[rows.len() - 1].clone());
                     } else {
                         // safety: rows is guarded to be atleast 1 less than rows.len()
-                        self.highlighted_name = Some(rows[i - 1].clone());
+                        self.hovered_dev = Some(rows[i - 1].clone());
                     }
                 }
                 None => {
@@ -113,14 +109,28 @@ impl App {
                     // as we assured above that rows is not empty
                     //
                     // safety: rows is guarded to be of len >= 1
-                    self.highlighted_name = Some(rows[0].clone());
+                    self.hovered_dev = Some(rows[0].clone());
                 }
             }
         } else {
             // safety: rows is guarded to be of len >= 1
-            self.highlighted_name = Some(rows[0].clone());
+            self.hovered_dev = Some(rows[0].clone());
         }
     }
+}
+
+use std::collections::HashSet;
+use std::hash::Hash;
+
+/// Removes duplicate elements from `items`, preserving the order of
+/// first occurrence. Duplicates don't need to be consecutive (unlike
+/// `Vec::dedup`, which only removes adjacent duplicates).
+fn dedup_preserve_order<T: Eq + Hash + Clone>(items: Vec<T>) -> Vec<T> {
+    let mut seen = HashSet::new();
+    items
+        .into_iter()
+        .filter(|item| seen.insert(item.clone()))
+        .collect()
 }
 
 pub fn run(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
@@ -137,9 +147,19 @@ pub fn run(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
                     KeyCode::Char('s') => app.view = SelectedMenu::Settings,
                     KeyCode::Char('h') => app.view = SelectedMenu::Help,
                     KeyCode::Char('d') => app.view = SelectedMenu::Devices,
+                    KeyCode::Backspace => {
+                        if let Some(hovered) = &app.hovered_dev {
+                            if crate::partitions::is_partition(&hovered) {
+                                app.commands.push(Command::DeletePartition { name: hovered.clone() })
+                            } else {
+                                app.commands.push(Command::DeletePartitionTable { name: hovered.clone() })
+                            }
+
+                            app.commands = dedup_preserve_order(app.commands);
+                        }
+                    }
                     KeyCode::Down => app.highlight_next(),
                     KeyCode::Up => app.highlight_previous(),
-                    KeyCode::Enter => app.selected_name = app.highlighted_name.clone(),
                     _ => {}
                 }
             }
@@ -164,11 +184,14 @@ fn flatten(disks: &[Disk]) -> Vec<String> {
 fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
 
-    let [body, footer] = Layout::vertical([
+    let [body, footer, debug] = Layout::vertical([
         Constraint::Min(0),
         Constraint::Length(1),
+        Constraint::Length(3),
     ])
     .areas(area);
+
+    frame.render_widget(Line::from(format!("{:?}", app.commands)), debug);
 
 
     let mut hotkey_bar_spans = Vec::new();
@@ -178,7 +201,9 @@ fn draw(frame: &mut Frame, app: &mut App) {
     hotkey_bar_spans.extend(spans_from_hotkey_word("W", "rite"));
     hotkey_bar_spans.push(Span::raw(" | "));
     hotkey_bar_spans.extend(spans_from_hotkey_word("R", "efresh"));
-    hotkey_bar_spans.push(Span::raw(" | ↑/↓: Select | Enter: Confirm | Esc: Back"));
+    hotkey_bar_spans.push(Span::raw(" | "));
+    hotkey_bar_spans.extend(spans_from_hotkey_word("F", "ormat"));
+    hotkey_bar_spans.push(Span::raw(" | ↑/↓: Select | ⌫: Delete"));
 
     frame.render_widget(
         Line::from(hotkey_bar_spans).centered(),
@@ -187,7 +212,7 @@ fn draw(frame: &mut Frame, app: &mut App) {
 
     match app.view {
         SelectedMenu::Devices => {
-            let mut items: Vec<Line> = Vec::new();
+            let mut rows: Vec<Line> = Vec::new();
             for disk in &app.disks {
                 let size_display = if let Some(size) = disk.size {
                     crate::disks::format_nbytes(size)
@@ -196,18 +221,7 @@ fn draw(frame: &mut Frame, app: &mut App) {
                 };
 
                 // maybe highlighted doesnt have to be an option?
-
-                let sel = if let Some(selected) = &app.selected_name {
-                    &disk.name == selected
-                } else {
-                    false
-                };
-
-                let hov = if let Some(highlighted) = &app.highlighted_name {
-                    &disk.name == highlighted
-                } else {
-                    false
-                };
+                let hov = app.hovered_dev.as_ref().map(|h| h == &disk.name).unwrap_or(false);
 
                 let drive_display_name = format!("{} {size_display} [{}]", disk.name.as_str(), crate::partitions::maybe_scheme_to_str(&disk.partition_scheme));
                 let mut drive_style = Style::new().bold();
@@ -216,26 +230,8 @@ fn draw(frame: &mut Frame, app: &mut App) {
                     drive_style = drive_style.add_modifier(Modifier::REVERSED);
                 }
 
-                items.push(Line::from(drive_display_name).style(drive_style));
+                rows.push(Line::from(drive_display_name).style(drive_style));
                 for (i, part) in disk.partitions.iter().enumerate() {
-                    let sel = if let Some(selected) = &app.selected_name {
-                        &part.name == selected
-                    } else {
-                        false
-                    };
-
-                    let hov = if let Some(highlighted) = &app.highlighted_name {
-                        &part.name == highlighted
-                    } else {
-                        false
-                    };
-
-                    let mut part_style = Style::new();
-
-                    if hov {
-                        part_style = part_style.add_modifier(Modifier::REVERSED);
-                    }
-
                     let branch = if i + 1 == disk.partitions.len() {
                         "╰─"
                     } else {
@@ -246,11 +242,44 @@ fn draw(frame: &mut Frame, app: &mut App) {
                     } else {
                         "UNK".to_string()
                     };
-                    items.push(Line::from(format!("  {branch} {} {part_size}", part.name)).style(part_style));
+                    
+                    let hov = app.hovered_dev.as_ref().map(|h| h == &part.name).unwrap_or(false);
+
+                    let mut part_style = Style::new();
+                    let mut old_style = part_style
+                        .fg(ratatui::style::Color::Red);
+
+                    let mut new_style = part_style
+                        .fg(ratatui::style::Color::Green);
+                    // with the fg/bg inversion ^ for now
+                    
+                    if hov {
+                        part_style = part_style.add_modifier(Modifier::REVERSED);
+                        old_style = old_style.add_modifier(Modifier::REVERSED);
+                        new_style = new_style.add_modifier(Modifier::REVERSED);
+                    }
+
+                    let modified = app.commands.iter().any(|c| c.relates_to(&part.name));
+                    
+                    if !modified {
+                        rows.push(Line::from(format!("  {branch} {} {part_size}", part.name)).style(part_style));
+                    } else {
+                        for command in &app.commands {
+                            if command.relates_to(&part.name) {
+                                match command {
+                                    Command::DeletePartition { .. } => {
+                                        rows.push(Line::from(format!("  {branch} {} {part_size}", part.name)).style(old_style));
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+
                 }
             }
 
-            let list = Paragraph::new(items)
+            let list = Paragraph::new(rows)
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
