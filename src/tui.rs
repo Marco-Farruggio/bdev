@@ -149,7 +149,7 @@ pub fn run(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
                     KeyCode::Char('d') => app.view = SelectedMenu::Devices,
                     KeyCode::Backspace => {
                         if let Some(hovered) = &app.hovered_dev {
-                            if crate::partitions::is_partition(&hovered) {
+                            if crate::parts::is_partition(&hovered) {
                                 app.commands.push(Command::DeletePartition { name: hovered.clone() })
                             } else {
                                 app.commands.push(Command::DeletePartitionTable { name: hovered.clone() })
@@ -223,7 +223,7 @@ fn draw(frame: &mut Frame, app: &mut App) {
                 // maybe highlighted doesnt have to be an option?
                 let hov = app.hovered_dev.as_ref().map(|h| h == &disk.name).unwrap_or(false);
 
-                let drive_display_name = format!("{} {size_display} [{}]", disk.name.as_str(), crate::partitions::maybe_scheme_to_str(&disk.partition_scheme));
+                let drive_display_name = format!("{} {size_display} [{}]", disk.name.as_str(), crate::parts::maybe_scheme_to_str(&disk.partition_scheme));
                 let mut drive_style = Style::new().bold();
                 
                 if hov {

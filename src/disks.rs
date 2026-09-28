@@ -1,4 +1,4 @@
-use crate::partitions::{
+use crate::parts::{
     Partition,
     PartitionScheme,
     is_partition,

@@ -1,5 +1,5 @@
-use crate::partitions::PartitionScheme;
-use crate::files::FileSystem;
+use crate::parts::PartitionScheme;
+use crate::filesys::FileSystem;
 
 #[derive(Debug, Hash, Clone)] // Temporarily
 #[derive(PartialEq, Eq)]

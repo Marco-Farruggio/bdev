@@ -5,3 +5,7 @@ pub enum FileSystem {
     Ntfs,
     Ext4,
 }
+
+pub fn detect_fs(first_sector: u64) -> Option<FileSystem> {
+    None // [TODO]
+}
