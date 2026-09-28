@@ -42,10 +42,11 @@ pub fn format_nbytes(nbytes: u64) -> String {
     format!("{size:.1} {}", UNITS[unit_index])
 }
 
+#[derive(Clone)]
 pub struct Disk {
     pub name: String,
     pub size: Option<u64>,
-    pub partition_scheme: Result<Option<PartitionScheme>, std::io::Error>,
+    pub partition_scheme: Result<Option<PartitionScheme>, String>,
     pub partitions: Vec<Partition>,
 }
 
@@ -75,7 +76,8 @@ pub fn read_block_devices() -> Vec<Disk> {
                         Partition {
                             name: name.clone(),
                             index: detect_partition_index(&name),
-                            size: crate::disks::read_size_bytes(&name)
+                            size: crate::disks::read_size_bytes(&name),
+                            fs: None, // [TODO] crate::file_sys::detect_fs(&name),
                         }
                     );
                 }

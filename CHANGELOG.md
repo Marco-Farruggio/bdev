@@ -23,6 +23,7 @@
 - handle selection myself instead of letting ratatui lists do it
 - moved all tui into tui.rs
 - detect partition index from /sys/class/block, rather than parsing each name
+- started using the std error as a string instead so that I can clone it
 
 # To-Do:
 
@@ -40,3 +41,5 @@
 - trait for partition schemes
 - make a nicer hotkey/menu generator func/macro
 - check is partition and partition index in one call
+- fix iterating through all commands applies rendering sequentially by denoting a heirachy of application
+  (e.g. delete > resize), whilst preserving order
