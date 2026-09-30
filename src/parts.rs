@@ -20,6 +20,12 @@ impl std::fmt::Display for PartitionScheme {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PartitionID(u32);
 
+impl std::fmt::Display for PartitionID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 #[derive(Clone)]
 pub struct Partition {
     pub name: String,

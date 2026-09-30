@@ -12,6 +12,7 @@ use crate::{
 };
 
 use std::fmt::{Display, Formatter};
+use std::io::Write;
 
 #[derive(Hash, Clone)]
 #[derive(PartialEq, Eq)]
@@ -149,16 +150,99 @@ impl Command {
     /// Sets self.error to None unless the shell-out failed, in which
     /// case self.error is set to the stderr of the process
     pub fn perform(&mut self) {
-        match self.change {
+        self.error = match self.change {
             Change::DeletePartitionTable { ref name } => {
                 // shell out to wipefs
+                match std::process::Command::new("wipefs")
+                    .args(["--all", &format!("/dev/{name}")])
+                    .output()
+                {
+                    Ok(output) if output.status.success() => None,
+                    Ok(output) => Some(
+                        String::from_utf8_lossy(&output.stderr)
+                            .trim()
+                            .to_owned()
+                    ),
+                    Err(error) => Some(error.to_string()),
+                }
             }
+
             Change::DeletePartition { ref name } => {
-                // shell out to wipefs
+                // shell out to sfdisk
+                let sysfs_path = format!("/sys/class/block/{name}");
+
+                let Some(parent) = std::fs::canonicalize(&sysfs_path)
+                    .ok()
+                    .and_then(|path| {
+                        path.parent()
+                            .and_then(|parent| parent.file_name())
+                            .map(|name| name.to_string_lossy().into_owned())
+                    })
+                else {
+                    return self.error = Some(format!("Could not determine parent disk of {name}"));
+                };
+
+                let Some(index) = crate::parts::detect_partition_index(name) else {
+                    return self.error = Some(format!("Could not determine partition index of {name}"));
+                };
+
+                match std::process::Command::new("sfdisk")
+                    .args([
+                        "--delete",
+                        &format!("/dev/{parent}"),
+                        &index.to_string(),
+                    ])
+                    .output()
+                {
+                    Ok(output) if output.status.success() => None,
+                    Ok(output) => Some(
+                        String::from_utf8_lossy(&output.stderr)
+                            .trim()
+                            .to_owned()
+                    ),
+                    Err(error) => Some(error.to_string()),
+                }
             }
+
             Change::ReformatPartitionTable { ref name, scheme } => {
                 // this is a lot more difficult
+                let label = match scheme {
+                    PartitionScheme::Mbr => "dos",
+                    PartitionScheme::Gpt => "gpt",
+                };
+
+                let mut child = match std::process::Command::new("sfdisk")
+                    .arg(format!("/dev/{name}"))
+                    .stdin(std::process::Stdio::piped())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::piped())
+                    .spawn()
+                {
+                    Ok(child) => child,
+                    Err(error) => {
+                        return self.error = Some(error.to_string());
+                    }
+                };
+
+                if let Some(mut stdin) = child.stdin.take() {
+                    if let Err(error) = writeln!(stdin, "label: {label}") {
+                        return self.error = Some(error.to_string());
+                    }
+                } else {
+                    return self.error = Some("Failed to open sfdisk stdin".to_owned());
+                }
+
+                match child.wait_with_output() {
+                    Ok(output) if output.status.success() => None,
+                    Ok(output) => Some(
+                        String::from_utf8_lossy(&output.stderr)
+                            .trim()
+                            .to_owned()
+                    ),
+                    Err(error) => Some(error.to_string()),
+                }
             }
+
             Change::ReformatPartition { ref partition, file_sys } => {
                 // shell out to mkfs
                 //
@@ -167,7 +251,29 @@ impl Command {
                 // and will receive any updates and fixes automatically, the main point
                 // of bdev is to replace fdisk/lsblk and unify them into a simple, yet
                 // powerfull TUI based (for now?) cli
+                let file_sys = match file_sys {
+                    FileSystem::Fat32 => "vfat",
+                    FileSystem::Ntfs => "ntfs",
+                    FileSystem::Ext4 => "ext4",
+                };
+
+                match std::process::Command::new("mkfs")
+                    .args([
+                        "-t",
+                        file_sys,
+                        &format!("/dev/{partition}"),
+                    ])
+                    .output()
+                {
+                    Ok(output) if output.status.success() => None,
+                    Ok(output) => Some(
+                        String::from_utf8_lossy(&output.stderr)
+                            .trim()
+                            .to_owned()
+                    ),
+                    Err(error) => Some(error.to_string()),
+                }
             }
-        }
+        };
     }
 }

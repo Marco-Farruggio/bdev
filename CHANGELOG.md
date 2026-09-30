@@ -61,3 +61,5 @@
 - deleting a partition should also wipe the FS marker that way tools don't detect it anymore just incase
 - make command.perform actually dispatch to increase the modularity
 - add an option to wipe a partitions fs signature
+- rename partition id to partition index, or just drop the type wrapper
+- make error messages wrap onto multiple lines in the changes menu
