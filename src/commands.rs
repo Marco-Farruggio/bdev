@@ -1,9 +1,11 @@
-//! A command is any form of change affecting a disk, partition, etc.
+//! A `Change` is any form of change affecting a disk, partition, etc.
 //! 
-//! A command contains its command itself, but also its last attempt status,
+//! A command contains both a, but also its last current error or lack therof,
 //! to be shown by the gui before pushing the writes to the disk(s)
 //! 
-//! A command can only affect one disk at a time, (e.g. not cross-disk copying)
+//! A change can only affect one disk at a time, (e.g. no cross-disk copying),
+//! (this is due to parallalelism, but may be revoked in a future update, though
+//! unlikely).
 
 use crate::{
     disks::Disk,
@@ -46,16 +48,6 @@ impl Display for Change {
             Self::ReformatPartition { partition, file_sys } => {
                 write!(f, "Reformat {partition} to {file_sys}")
             }
-        }
-    }
-}
-impl Change {
-    pub fn relates_to(&self, device: &str) -> bool {
-        match self {
-            Self::DeletePartitionTable { name } => name == device,
-            Self::DeletePartition { name } => name == device,
-            Self::ReformatPartitionTable { name, .. } => name == device,
-            Self::ReformatPartition { partition, .. } => partition == device,
         }
     }
 }
