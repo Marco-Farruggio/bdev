@@ -24,6 +24,10 @@
 - moved all tui into tui.rs
 - detect partition index from /sys/class/block, rather than parsing each name
 - started using the std error as a string instead so that I can clone it
+- added a full implementation for each command in memory
+- swapped to a split scren view, with the devices branch on the left and changes/settings/help on the right
+- only shows the new tree not a diff view (for now?) in the tui
+- deleting a partition table now deletes all partitions in memory
 
 # To-Do:
 
@@ -43,3 +47,17 @@
 - check is partition and partition index in one call
 - fix iterating through all commands applies rendering sequentially by denoting a heirachy of application
   (e.g. delete > resize), whilst preserving order
+- fix not being able to format a scheme after having wiped it
+- swap to a better ID, especially for disks (and partitions too actually), sda/b depend on plug order, unacceptable later
+- stop modifying things youve 'selected' when they dont exist anymore after a refresh (again, better selection system needed)
+- resize partitions
+- new partition
+- allow choice when reformating
+- need to tell the OS to update/refresh/rescan
+- confirmation screen for write
+- fix selection logic
+- _N_ew hotkey to create new partition
+- highlight device, (namespace?), partition as selecting enters deeper depths of the tree
+- deleting a partition should also wipe the FS marker that way tools don't detect it anymore just incase
+- make command.perform actually dispatch to increase the modularity
+- add an option to wipe a partitions fs signature

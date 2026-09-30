@@ -81,9 +81,39 @@ impl Command {
                 // we set Error to a nice human readable string.
                 if let Some(disk) = disks.iter_mut().find(|d| &d.name == name) {
                     disk.partition_scheme = Ok(None);
+                    disk.partitions = Vec::new(); // Delete all partition entries
                     self.error = None;
                 } else {
                     self.error = Some(format!("Can't find {name}. Try refreshing."));
+                }
+            }
+            Change::DeletePartition { ref name } => {
+                // Find the partition by full name, delete it from the disks list of partitions,
+                // if we can't find said partition, set the error string
+                // ...existing code...
+                let mut found = false;
+
+                for disk in disks.iter_mut() {
+                    if let Some(pos) = disk.partitions.iter().position(|p| &p.name == name) {
+                        disk.partitions.remove(pos);
+                        found = true;
+                        break;
+                    }
+                }
+
+                if found {
+                    self.error = None;
+                } else {
+                    self.error = Some(format!("Can't find {name}. Try refreshing."));
+                }
+            }
+            Change::ReformatPartitionTable { ref name, scheme } => {
+                // Find the disk, if it exists assume thats okay, otherwise, error string it is
+                if let Some(disk) = disks.iter_mut().find(|d| &d.name == name) {
+                    disk.partition_scheme = Ok(Some(scheme));
+                    self.error = None;
+                } else {
+                    self.error = Some(format!("Could not find disk {name}"));
                 }
             }
             Change::ReformatPartition { ref partition, file_sys } => {
@@ -106,16 +136,38 @@ impl Command {
                     self.error = Some(format!("Can't find {partition}. Try refreshing."));
                 }
             }
-            _ => {
-                self.error = Some("This feature is not yet implemented.".into());
-            }
+            // _ => {
+            //     self.error = Some("This feature is not yet implemented.".into());
+            // }
         }
     }
 
     /// dispatch to the relevant bdev subsytem, disks/parts/file_sys etc
     /// to perform the action, setting command.error as it goes, and 
     /// returning the same error.
-    pub fn perform(&mut self) -> Result<(), String> {
-        Ok(()) // [TODO]
+    /// 
+    /// Sets self.error to None unless the shell-out failed, in which
+    /// case self.error is set to the stderr of the process
+    pub fn perform(&mut self) {
+        match self.change {
+            Change::DeletePartitionTable { ref name } => {
+                // shell out to wipefs
+            }
+            Change::DeletePartition { ref name } => {
+                // shell out to wipefs
+            }
+            Change::ReformatPartitionTable { ref name, scheme } => {
+                // this is a lot more difficult
+            }
+            Change::ReformatPartition { ref partition, file_sys } => {
+                // shell out to mkfs
+                //
+                // I have considered hand rolling this, but have decided against it,
+                // MKFS is already polished and maintained to a high standard,
+                // and will receive any updates and fixes automatically, the main point
+                // of bdev is to replace fdisk/lsblk and unify them into a simple, yet
+                // powerfull TUI based (for now?) cli
+            }
+        }
     }
 }

@@ -59,6 +59,13 @@ struct App {
 }
 
 impl App {
+    /// Selection logic:
+    /// 
+    /// References by name, but if it can't be found, it falls back
+    /// to the index into the list of rows, if the index is greater
+    /// than the list of devices, it shoots back to the highest index
+    /// row, and if there are no devices (impossible?)
+    /// then it simply sets it to None
     fn new() -> Self {
         let disks = read_block_devices();
         let highlighted_name = flatten(&disks).into_iter().next();
@@ -212,6 +219,15 @@ pub fn run(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
                             }
                         }
                     }
+                    KeyCode::Char('w') => {
+                        for command in app.commands.iter_mut() {
+                            command.perform();
+                        }
+                    }
+                    // KeyCode::Char('c') => {
+                    //     app.commands.clear();
+                    //     app.new_disks = app.old_disks.clone();
+                    // }
                     KeyCode::Down => app.highlight_next(),
                     KeyCode::Up => app.highlight_previous(),
                     _ => {}
@@ -353,29 +369,29 @@ fn draw(frame: &mut Frame, app: &mut App) {
                 new_style = new_style.add_modifier(Modifier::REVERSED);
             }
 
-            let modified = app.commands.iter().any(|c| c.change.relates_to(&part.name));
+            rows.push(Line::from(format!("  {branch} {} {part_size}", part.name)).style(part_style));
+            // let modified = app.commands.iter().any(|c| c.change.relates_to(&part.name));
             
-            if !modified {
-                rows.push(Line::from(format!("  {branch} {} {part_size}", part.name)).style(part_style));
-            } else {
-                for command in &app.commands {
-                    if command.change.relates_to(&part.name) {
-                        match command.change {
-                            Change::DeletePartition { .. } => {
-                                rows.push(Line::from(format!("  {branch} {} {part_size}", part.name)).style(old_style));
-                            }
-                            Change::ReformatPartition { ref partition, file_sys } => {
-                                rows.push(Line::from(vec![
-                                    Span::raw(format!("  {branch} {} {part_size} ", part.name)).style(part_style),
-                                    Span::raw(format!("MBR")).style(old_style),
-                                    Span::raw(format!("{file_sys}")).style(new_style),
-                                ]));
-                            }
-                            _ => {} // THIS IS WHY IT DISAPPEARED
-                        }
-                    }
-                }
-            }
+            // if !modified {
+            // } else {
+            //     for command in &app.commands {
+            //         if command.change.relates_to(&part.name) {
+            //             match command.change {
+            //                 Change::DeletePartition { .. } => {
+            //                     rows.push(Line::from(format!("  {branch} {} {part_size}", part.name)).style(old_style));
+            //                 }
+            //                 Change::ReformatPartition { ref partition, file_sys } => {
+            //                     rows.push(Line::from(vec![
+            //                         Span::raw(format!("  {branch} {} {part_size} ", part.name)).style(part_style),
+            //                         Span::raw(format!("MBR")).style(old_style),
+            //                         Span::raw(format!("{file_sys}")).style(new_style),
+            //                     ]));
+            //                 }
+            //                 _ => {} // THIS IS WHY IT DISAPPEARED
+            //             }
+            //         }
+            //     }
+            // }
 
         }
     }
