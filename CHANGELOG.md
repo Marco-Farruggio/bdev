@@ -28,6 +28,8 @@
 - swapped to a split scren view, with the devices branch on the left and changes/settings/help on the right
 - only shows the new tree not a diff view (for now?) in the tui
 - deleting a partition table now deletes all partitions in memory
+- swapped to dual license MIT or APACHE 2.0
+- setup cargo.toml properly for AUR upload
 
 # To-Do:
 

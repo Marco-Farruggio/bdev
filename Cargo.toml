@@ -2,6 +2,17 @@
 name = "bdev"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "TUI block device and partition tool"
+repository = "https://github.com/Marco-Farruggio/bdev"
+readme = "README.md"
+keywords = ["disk", "partition", "tui", "block-device", "linux"]
+categories = ["command-line-utilities", "filesystem"]
 
 [dependencies]
 ratatui = "0.30.2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
