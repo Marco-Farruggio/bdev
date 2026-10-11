@@ -30,6 +30,9 @@
 - deleting a partition table now deletes all partitions in memory
 - swapped to dual license MIT or APACHE 2.0
 - setup cargo.toml properly for AUR upload
+- create a new partition
+- green text for successfully written changes
+- removed wrapper type PartitionID
 
 # To-Do:
 
@@ -58,10 +61,17 @@
 - need to tell the OS to update/refresh/rescan
 - confirmation screen for write
 - fix selection logic
-- _N_ew hotkey to create new partition
 - highlight device, (namespace?), partition as selecting enters deeper depths of the tree
 - deleting a partition should also wipe the FS marker that way tools don't detect it anymore just incase
 - make command.perform actually dispatch to increase the modularity
 - add an option to wipe a partitions fs signature
 - rename partition id to partition index, or just drop the type wrapper
 - make error messages wrap onto multiple lines in the changes menu
+- option to create partition
+- make wrapped error messages on the changes window line up indentation wise
+- successfully written changes: green
+- allow for creating multiple new partitions
+- detect filetype per partition
+- detect mount points
+- for 'step by step' writing, make perform not perform an already written command, maybe some command ID?
+- capture permission denieds and show sudo required

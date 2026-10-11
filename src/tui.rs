@@ -15,6 +15,7 @@ use ratatui::{
         Layout,
     },
     style::{
+        Color,
         Modifier,
         Style,
     },
@@ -23,17 +24,18 @@ use ratatui::{
         Span,
     },
     widgets::{
-        Block,
         BorderType,
-        Borders,
         Paragraph,
+        Borders,
+        Block,
+        Wrap,
     }
 };
 
 use crate::{
     disks::{Disk, read_block_devices},
     commands::{Command, Change},
-    parts::PartitionScheme,
+    parts::{PartitionScheme, disk_scheme_label},
     filesys::FileSystem,
 };
 
@@ -224,6 +226,24 @@ pub fn run(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
                             command.perform();
                         }
                     }
+                    KeyCode::Char('n') => {
+                        // create a new partition on the currently selected disk
+
+                        // if a partition is selected, try to find the parent disk
+                        if let Some(hovered) = &app.hovered_dev {
+                            let disk = if crate::parts::is_partition(&hovered) {
+                                // assume only failure is that it is already a disk
+                                crate::parts::get_parent_disk_name(&hovered).unwrap_or_else(|| hovered.clone())
+                            } else {
+                                hovered.clone()
+                            };
+                            let command = Command::new(Change::CreatePartition { parent_disk: disk, size: 1024 * 1024 * 1024, file_sys: FileSystem::Fat32 });
+
+                            if app.commands.iter().find(|c| c.change == command.change).is_none() {
+                                app.apply_change(command);
+                            }
+                        }
+                    }
                     // KeyCode::Char('c') => {
                     //     app.commands.clear();
                     //     app.new_disks = app.old_disks.clone();
@@ -268,24 +288,31 @@ fn draw(frame: &mut Frame, app: &mut App) {
     let right_paragraph = match app.menu {
         SelectedMenu::Changes => {
             let mut changes = Vec::new();
-            for command in app.commands.iter() {
-                if command.error.is_none() {
-                    changes.push(Line::raw(format!("• {}", command.change)));
-                } else {
-                    let red_style = Style::new().fg(ratatui::style::Color::Red);
+            let red_style = Style::new().fg(ratatui::style::Color::Red);
+            let green_style = Style::new().fg(ratatui::style::Color::Green);
 
-                    changes.push(Line::raw(format!("• {}", command.change)));
-                    changes.push(Line::raw(format!("  ╰─ {}", command.error.clone().unwrap())).style(red_style));
+            for command in app.commands.iter() {
+                let mut line = Line::raw(format!("• {}", command.change));
+
+                if let Some(error) = &command.error {
+                    line = Line::raw(format!("• {}", command.change)).style(red_style);
+                    changes.push(line);
+                    changes.push(Line::raw(format!("  ╰─ {error}")).style(red_style));
+                } else if command.written_successfully {
+                    line = Line::raw(format!("• {}", command.change)).style(green_style);
+                    changes.push(line);
+                } else {
+                    changes.push(line);
                 }
             }
 
-            Paragraph::new(changes)
+            Paragraph::new(changes).wrap(Wrap { trim: false })
         }
         SelectedMenu::Settings => {
-            Paragraph::new(Line::raw("You're in settings"))
+            Paragraph::new(Line::raw("You're in Settings"))
         }
         SelectedMenu::Help => {
-            Paragraph::new(Line::raw("w -> Write"))
+            Paragraph::new(Line::raw("You're in Help"))
         }
     };
 
@@ -315,6 +342,8 @@ fn draw(frame: &mut Frame, app: &mut App) {
     hotkey_bar_spans.extend(spans_from_hotkey_word("F", "ormat"));
     hotkey_bar_spans.push(Span::raw(" | "));
     hotkey_bar_spans.extend(spans_from_hotkey_word("D", "elete"));
+    hotkey_bar_spans.push(Span::raw(" | "));
+    hotkey_bar_spans.extend(spans_from_hotkey_word("N", "ew Partition"));
     // arrow keys to select up/down are ommitted here because I consider them obvious (again, opinionated)
 
     frame.render_widget(
@@ -333,14 +362,23 @@ fn draw(frame: &mut Frame, app: &mut App) {
         // maybe highlighted doesnt have to be an option?
         let hov = app.hovered_dev.as_ref().map(|h| h == &disk.name).unwrap_or(false);
 
-        let drive_display_name = format!("{} {size_display} [{}]", disk.name.as_str(), crate::parts::maybe_scheme_to_str(&disk.partition_scheme));
+        let scheme_label = disk_scheme_label(&disk.partition_scheme);
+        let scheme_style = match &disk.partition_scheme {
+            Err(_) => Style::new().fg(Color::Red),
+            Ok(_) => Style::new(),
+        };
+
+        let drive_display_name = format!("{} {size_display}", disk.name.as_str());
         let mut drive_style = Style::new().bold();
-        
+
         if hov {
             drive_style = drive_style.add_modifier(Modifier::REVERSED);
         }
 
-        rows.push(Line::from(drive_display_name).style(drive_style));
+        rows.push(Line::from(vec![
+            Span::raw(drive_display_name).style(drive_style),
+            Span::styled(format!(" {scheme_label}"), scheme_style),
+        ]));
         for (i, part) in disk.partitions.iter().enumerate() {
             let branch = if i + 1 == disk.partitions.len() {
                 "╰─"
