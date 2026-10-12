@@ -37,6 +37,7 @@
 - removed an unused diff.rs
 - removed the multiple menues
 - show an error on trying to create a new partition on a disk with no partition scheme
+- added the capability to detect mount points
 
 # To-Do:
 

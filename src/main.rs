@@ -2,10 +2,11 @@
 //! 
 //! bdev is a block device manipulation CLI TUI written in Rust for Linux
 
-mod parts;
 mod commands;
-mod disks;
 mod filesys;
+mod parts;
+mod disks;
+mod mount;
 mod tui;
 mod mbr;
 

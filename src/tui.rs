@@ -159,20 +159,6 @@ impl App {
     }
 }
 
-use std::collections::HashSet;
-use std::hash::Hash;
-
-/// Removes duplicate elements from `items`, preserving the order of
-/// first occurrence. Duplicates don't need to be consecutive (unlike
-/// `Vec::dedup`, which only removes adjacent duplicates).
-fn dedup_preserve_order<T: Eq + Hash + Clone>(items: Vec<T>) -> Vec<T> {
-    let mut seen = HashSet::new();
-    items
-        .into_iter()
-        .filter(|item| seen.insert(item.clone()))
-        .collect()
-}
-
 pub fn run(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
     let mut app = App::new();
 
