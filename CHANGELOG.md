@@ -33,6 +33,10 @@
 - create a new partition
 - green text for successfully written changes
 - removed wrapper type PartitionID
+- added some early returns for creating a partition in memory
+- removed an unused diff.rs
+- removed the multiple menues
+- show an error on trying to create a new partition on a disk with no partition scheme
 
 # To-Do:
 

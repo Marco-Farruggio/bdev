@@ -46,14 +46,7 @@ pub fn spans_from_hotkey_word<'a>(letter: &'a str, rest: &'a str) -> Vec<Span<'a
     ]
 }
 
-pub enum SelectedMenu {
-    Changes,
-    Settings,
-    Help
-}
-
 struct App {
-    menu: SelectedMenu,
     hovered_dev: Option<String>,
     commands: Vec<Command>,
     old_disks: Vec<Disk>,
@@ -72,7 +65,6 @@ impl App {
         let disks = read_block_devices();
         let highlighted_name = flatten(&disks).into_iter().next();
         Self {
-            menu: SelectedMenu::Changes,
             commands: Vec::new(),
             old_disks: disks.clone(),
             new_disks: disks,
@@ -192,9 +184,6 @@ pub fn run(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
                     KeyCode::Char('r') => app.refresh(),
-                    KeyCode::Char('s') => app.menu = SelectedMenu::Settings,
-                    KeyCode::Char('h') => app.menu = SelectedMenu::Help,
-                    KeyCode::Char('c') => app.menu = SelectedMenu::Changes,
                     KeyCode::Char('d') => {
                         if let Some(hovered) = &app.hovered_dev {
                             let command = if crate::parts::is_partition(&hovered) {
@@ -223,7 +212,7 @@ pub fn run(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
                     }
                     KeyCode::Char('w') => {
                         for command in app.commands.iter_mut() {
-                            command.perform();
+                            command.write();
                         }
                     }
                     KeyCode::Char('n') => {
@@ -244,10 +233,10 @@ pub fn run(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
                             }
                         }
                     }
-                    // KeyCode::Char('c') => {
-                    //     app.commands.clear();
-                    //     app.new_disks = app.old_disks.clone();
-                    // }
+                    KeyCode::Char('c') => {
+                        app.commands.clear();
+                        app.new_disks = app.old_disks.clone();
+                    }
                     KeyCode::Down => app.highlight_next(),
                     KeyCode::Up => app.highlight_previous(),
                     _ => {}
@@ -285,35 +274,27 @@ fn draw(frame: &mut Frame, app: &mut App) {
         Constraint::Min(0),
     ]).areas(body);
 
-    let right_paragraph = match app.menu {
-        SelectedMenu::Changes => {
-            let mut changes = Vec::new();
-            let red_style = Style::new().fg(ratatui::style::Color::Red);
-            let green_style = Style::new().fg(ratatui::style::Color::Green);
+    let right_paragraph = {
+        let mut changes = Vec::new();
+        let red_style = Style::new().fg(ratatui::style::Color::Red);
+        let green_style = Style::new().fg(ratatui::style::Color::Green);
 
-            for command in app.commands.iter() {
-                let mut line = Line::raw(format!("• {}", command.change));
+        for command in app.commands.iter() {
+            let mut line = Line::raw(format!("• {}", command.change));
 
-                if let Some(error) = &command.error {
-                    line = Line::raw(format!("• {}", command.change)).style(red_style);
-                    changes.push(line);
-                    changes.push(Line::raw(format!("  ╰─ {error}")).style(red_style));
-                } else if command.written_successfully {
-                    line = Line::raw(format!("• {}", command.change)).style(green_style);
-                    changes.push(line);
-                } else {
-                    changes.push(line);
-                }
+            if let Some(error) = &command.error {
+                line = Line::raw(format!("• {}", command.change)).style(red_style);
+                changes.push(line);
+                changes.push(Line::raw(format!("  ╰─ {error}")).style(red_style));
+            } else if command.written_successfully {
+                line = Line::raw(format!("• {}", command.change)).style(green_style);
+                changes.push(line);
+            } else {
+                changes.push(line);
             }
+        }
 
-            Paragraph::new(changes).wrap(Wrap { trim: false })
-        }
-        SelectedMenu::Settings => {
-            Paragraph::new(Line::raw("You're in Settings"))
-        }
-        SelectedMenu::Help => {
-            Paragraph::new(Line::raw("You're in Help"))
-        }
+        Paragraph::new(changes).wrap(Wrap { trim: false })
     };
 
     let right_block = right_paragraph
@@ -321,9 +302,7 @@ fn draw(frame: &mut Frame, app: &mut App) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .title(Line::from(spans_from_hotkey_word("C", "hanges")).centered())
-                .title(Line::from(spans_from_hotkey_word("S", "ettings")).centered())
-                .title(Line::from(spans_from_hotkey_word("H", "elp")).centered())
+                .title(Line::raw("Changes").centered())
                 .title_bottom(Line::from("bdev v0.1.0").right_aligned())
         );
 
@@ -342,6 +321,8 @@ fn draw(frame: &mut Frame, app: &mut App) {
     hotkey_bar_spans.extend(spans_from_hotkey_word("F", "ormat"));
     hotkey_bar_spans.push(Span::raw(" | "));
     hotkey_bar_spans.extend(spans_from_hotkey_word("D", "elete"));
+    hotkey_bar_spans.push(Span::raw(" | "));
+    hotkey_bar_spans.extend(spans_from_hotkey_word("C", "lear"));
     hotkey_bar_spans.push(Span::raw(" | "));
     hotkey_bar_spans.extend(spans_from_hotkey_word("N", "ew Partition"));
     // arrow keys to select up/down are ommitted here because I consider them obvious (again, opinionated)

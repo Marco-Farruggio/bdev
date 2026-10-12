@@ -149,36 +149,48 @@ impl Command {
             }
             Change::CreatePartition {
                 ref parent_disk,
+                // todo: start_sector: uXX,
                 size,
                 file_sys,
             } => {
                 // Find the disk, if it exists, create a new partition entry with the given size and filesystem,
                 // and add it to the disk's partitions. If the disk doesn't exist, set an error string.
 
-                if let Some(disk) = disks.iter_mut().find(|d| &d.name == parent_disk) {
-                    // note: the partition.name is actually the kernel name eg sda1 or nvme0n1p1
-                    // name: the full partition address, e.g. "
-                    // construct a new name for the partition
-                    let new_index = disk // = highest + 1
-                        .partitions
-                        .iter()
-                        .filter_map(|p| p.index)
-                        .max()
-                        .map_or(0, |max_index| max_index + 1);
-
-                    let full_part_addr = format!("{}{}", disk.name, new_index + 1);
-
-                    let new_partition = crate::parts::Partition {
-                        name: full_part_addr.clone(),
-                        index: Some(new_index),
-                        size: Some(size),
-                        fs: Some(file_sys),
-                    };
-                    disk.partitions.push(new_partition);
-                    self.error = None;
-                } else {
-                    self.error = Some(format!("Could not find disk {parent_disk}"));
+                // early return just in case the disk doesn't exist anymore,
+                // this could be caused by a refresh, or some weird permissions issue?
+                let Some(disk) = disks.iter_mut().find(|d| &d.name == parent_disk) else {
+                    self.error = Some(format!("Can't find {parent_disk}."));
+                    return;
+                };
+                
+                // if there was an error reading the partition scheme or there is none (RAW), error out
+                if !matches!(&disk.partition_scheme, Ok(Some(_))) {
+                    self.error = Some(format!(
+                        "Cannot create a partition on {parent_disk}: no partition scheme is available."
+                    ));
+                    return;
                 }
+                
+                // note: the partition.name is actually the kernel name eg sda1 or nvme0n1p1
+                // name: the full partition address, e.g. "
+                // construct a new name for the partition
+                let new_index = disk // = highest + 1
+                    .partitions
+                    .iter()
+                    .filter_map(|p| p.index)
+                    .max()
+                    .map_or(0, |max_index| max_index + 1);
+
+                let full_part_addr = format!("{}{}", disk.name, new_index + 1);
+
+                let new_partition = crate::parts::Partition {
+                    name: full_part_addr.clone(),
+                    index: Some(new_index),
+                    size: Some(size),
+                    fs: Some(file_sys),
+                };
+                disk.partitions.push(new_partition);
+                self.error = None;
             }
         }
     }
@@ -189,7 +201,7 @@ impl Command {
     ///
     /// Sets self.error to None unless the shell-out failed, in which
     /// case self.error is set to the stderr of the process
-    pub fn perform(&mut self) {
+    pub fn write(&mut self) {
         self.written_successfully = false;
 
         self.error = match self.change {
